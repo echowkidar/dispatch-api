@@ -176,7 +176,7 @@ async def extract_dispatch_fields(
         raise HTTPException(status_code=400, detail=f"Could not read image: {e}")
 
     active_model = model or model_query or MODEL_NAME
-    active_prompt = prompt or PROMPT_TEXT
+    active_prompt = (prompt + "\n\nOutput ONLY a valid JSON object. No markdown, no explanation.") if prompt else PROMPT_TEXT
     safe_name = sanitize_filename(file.filename)
     start = time.time()
     async with _inference_lock:
