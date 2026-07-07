@@ -1,0 +1,30 @@
+services:
+  dispatch-api:
+    build: .
+    container_name: dispatch-api
+    restart: unless-stopped
+    environment:
+      - PROVIDER=ollama                        # ollama | openai
+      - OLLAMA_HOST=http://ollama:11434
+      - OPENAI_BASE_URL=https://api.openai.com/v1  # change for Groq/Together/LM Studio
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - MODEL_NAME=gemma4:12b
+      - API_KEY=${DISPATCH_API_KEY}
+      - MAX_IMAGE_DIM=1600
+      - JPEG_QUALITY=85
+      - NUM_CTX=6144
+      - NUM_PREDICT=350
+      - NUM_THREAD=8
+      - REQUEST_TIMEOUT=180
+    expose:
+      - "8000"
+    networks:
+      - proxy
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+networks:
+  proxy:
+    external: true
