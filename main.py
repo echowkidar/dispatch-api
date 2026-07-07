@@ -158,7 +158,7 @@ async def health():
 async def extract_dispatch_fields(
     file: UploadFile = File(...),
     x_api_key: str | None = Header(default=None),
-    model: str | None = None,
+    model: str | None = Form(default=None),
     prompt: str | None = Form(default=None),
 ):
     check_api_key(x_api_key)
