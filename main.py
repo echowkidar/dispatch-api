@@ -158,6 +158,7 @@ async def health():
 async def extract_dispatch_fields(
     file: UploadFile = File(...),
     x_api_key: str | None = Header(default=None),
+    model_query: str | None = None,
     model: str | None = Form(default=None),
     prompt: str | None = Form(default=None),
 ):
@@ -173,7 +174,7 @@ async def extract_dispatch_fields(
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Could not read image: {e}")
 
-    active_model = model or MODEL_NAME
+    active_model = model or model_query or MODEL_NAME
     active_prompt = prompt or PROMPT_TEXT
     safe_name = sanitize_filename(file.filename)
     start = time.time()
