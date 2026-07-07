@@ -8,7 +8,7 @@ import asyncio
 import logging
 
 import httpx
-from fastapi import FastAPI, UploadFile, File, Header, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, Header, HTTPException
 from fastapi.responses import JSONResponse
 from PIL import Image
 
@@ -83,10 +83,10 @@ def extract_json(raw_text: str) -> dict:
     return json.loads(text[start:end + 1])
 
 
-async def call_ollama(image_b64: str, model: str) -> dict:
+async def call_ollama(image_b64: str, model: str, prompt: str) -> tuple[dict, str]:
     payload = {
         "model": model,
-        "prompt": PROMPT_TEXT,
+        "prompt": prompt,
         "images": [image_b64],
         "stream": False,
         "think": False,
@@ -105,10 +105,10 @@ async def call_ollama(image_b64: str, model: str) -> dict:
     async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
         resp = await client.post(f"{OLLAMA_HOST}/api/generate", json=payload)
         resp.raise_for_status()
-    return extract_json(resp.json().get("response", ""))
+    return extract_json(resp.json().get("response", "")), model
 
 
-async def call_openai_compatible(image_b64: str, model: str) -> dict:
+async def call_openai_compatible(image_b64: str, model: str, prompt: str) -> tuple[dict, str]:
     """Works with OpenAI, Groq, Together, LM Studio, or any OpenAI-compatible endpoint."""
     headers = {"Content-Type": "application/json"}
     if OPENAI_API_KEY:
@@ -120,7 +120,7 @@ async def call_openai_compatible(image_b64: str, model: str) -> dict:
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": PROMPT_TEXT},
+                    {"type": "text", "text": prompt},
                     {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"}},
                 ],
             }
@@ -133,13 +133,20 @@ async def call_openai_compatible(image_b64: str, model: str) -> dict:
         resp = await client.post(f"{OPENAI_BASE_URL}/chat/completions", json=payload, headers=headers)
         resp.raise_for_status()
     content = resp.json()["choices"][0]["message"]["content"]
-    return extract_json(content)
+    return extract_json(content), model
 
 
-async def call_model(image_b64: str, model: str) -> dict:
+async def call_model(image_b64: str, model: str, prompt: str) -> tuple[dict, str]:
     if PROVIDER == "openai":
-        return await call_openai_compatible(image_b64, model)
-    return await call_ollama(image_b64, model)
+        return await call_openai_compatible(image_b64, model, prompt)
+    fallback = FALLBACK_MODEL
+    try:
+        return await call_ollama(image_b64, model, prompt)
+    except (httpx.HTTPStatusError, httpx.TimeoutException, ValueError, json.JSONDecodeError) as e:
+        if fallback and fallback != model:
+            log.warning("Model %s failed (%s), falling back to %s", model, type(e).__name__, fallback)
+            return await call_ollama(image_b64, fallback, prompt)
+        raise
 
 
 @app.get("/health")
@@ -152,6 +159,7 @@ async def extract_dispatch_fields(
     file: UploadFile = File(...),
     x_api_key: str | None = Header(default=None),
     model: str | None = None,
+    prompt: str | None = Form(default=None),
 ):
     check_api_key(x_api_key)
     validate_file(file)
@@ -166,11 +174,12 @@ async def extract_dispatch_fields(
         raise HTTPException(status_code=400, detail=f"Could not read image: {e}")
 
     active_model = model or MODEL_NAME
+    active_prompt = prompt or PROMPT_TEXT
     safe_name = sanitize_filename(file.filename)
     start = time.time()
     async with _inference_lock:
         try:
-            result = await call_model(image_b64, active_model)
+            result, used_model = await call_model(image_b64, active_model, active_prompt)
         except httpx.HTTPStatusError as e:
             log.error("Model HTTP error: %s", e)
             raise HTTPException(status_code=502, detail="Model returned an error")
@@ -183,4 +192,4 @@ async def extract_dispatch_fields(
     elapsed = round(time.time() - start, 2)
     log.info("Processed %s in %.2fs", safe_name, elapsed)
 
-    return JSONResponse(content={"result": result, "model_used": active_model, "processing_seconds": elapsed})
+    return JSONResponse(content={"result": result, "model_used": used_model, "processing_seconds": elapsed})
