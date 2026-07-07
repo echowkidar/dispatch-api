@@ -83,9 +83,9 @@ def extract_json(raw_text: str) -> dict:
     return json.loads(text[start:end + 1])
 
 
-async def call_ollama(image_b64: str) -> dict:
+async def call_ollama(image_b64: str, model: str) -> dict:
     payload = {
-        "model": MODEL_NAME,
+        "model": model,
         "prompt": PROMPT_TEXT,
         "images": [image_b64],
         "stream": False,
@@ -108,14 +108,14 @@ async def call_ollama(image_b64: str) -> dict:
     return extract_json(resp.json().get("response", ""))
 
 
-async def call_openai_compatible(image_b64: str) -> dict:
+async def call_openai_compatible(image_b64: str, model: str) -> dict:
     """Works with OpenAI, Groq, Together, LM Studio, or any OpenAI-compatible endpoint."""
     headers = {"Content-Type": "application/json"}
     if OPENAI_API_KEY:
         headers["Authorization"] = f"Bearer {OPENAI_API_KEY}"
 
     payload = {
-        "model": MODEL_NAME,
+        "model": model,
         "messages": [
             {
                 "role": "user",
@@ -136,10 +136,10 @@ async def call_openai_compatible(image_b64: str) -> dict:
     return extract_json(content)
 
 
-async def call_model(image_b64: str) -> dict:
+async def call_model(image_b64: str, model: str) -> dict:
     if PROVIDER == "openai":
-        return await call_openai_compatible(image_b64)
-    return await call_ollama(image_b64)
+        return await call_openai_compatible(image_b64, model)
+    return await call_ollama(image_b64, model)
 
 
 @app.get("/health")
@@ -151,6 +151,7 @@ async def health():
 async def extract_dispatch_fields(
     file: UploadFile = File(...),
     x_api_key: str | None = Header(default=None),
+    model: str | None = None,
 ):
     check_api_key(x_api_key)
     validate_file(file)
@@ -164,11 +165,12 @@ async def extract_dispatch_fields(
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Could not read image: {e}")
 
+    active_model = model or MODEL_NAME
     safe_name = sanitize_filename(file.filename)
     start = time.time()
     async with _inference_lock:
         try:
-            result = await call_model(image_b64)
+            result = await call_model(image_b64, active_model)
         except httpx.HTTPStatusError as e:
             log.error("Model HTTP error: %s", e)
             raise HTTPException(status_code=502, detail="Model returned an error")
@@ -181,4 +183,4 @@ async def extract_dispatch_fields(
     elapsed = round(time.time() - start, 2)
     log.info("Processed %s in %.2fs", safe_name, elapsed)
 
-    return JSONResponse(content={"result": result, "processing_seconds": elapsed})
+    return JSONResponse(content={"result": result, "model_used": active_model, "processing_seconds": elapsed})
