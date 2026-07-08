@@ -85,13 +85,13 @@ def extract_json(raw_text: str) -> dict:
 
 
 async def call_ollama(image_b64: str, model: str, prompt: str) -> tuple[dict, str]:
+    is_cloud = model.endswith(":cloud")
     payload = {
         "model": model,
         "prompt": prompt,
         "images": [image_b64],
         "stream": False,
         "think": False,
-        "format": "json",
         "keep_alive": "30m",
         "options": {
             "temperature": 0,
@@ -103,6 +103,8 @@ async def call_ollama(image_b64: str, model: str, prompt: str) -> tuple[dict, st
             "num_thread": NUM_THREAD,
         },
     }
+    if not is_cloud:
+        payload["format"] = "json"
     async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
         resp = await client.post(f"{OLLAMA_HOST}/api/generate", json=payload)
         resp.raise_for_status()
