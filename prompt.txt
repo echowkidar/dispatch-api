@@ -45,9 +45,9 @@ SUBJECT
 - If missing, generate one: factual, professional, office-style, max 15 words, based only on document contents, no invented names/dates/departments. Style like: "Forwarding of Last Pay Certificate", "Grant of Child Care Leave", "Submission of Attendance Report".
 - If document concerns 1–5 named employees, append them in brackets, e.g. "Forwarding of Last Pay Certificate (Mohammad Asif [10235])". If more than 5 employees, do not list names in subject.
 
-DISPATCH NUMBER — look for Dispatch No./D.No./Diary No./Memo No./Letter No./Office Memo No./Reference No./Ref No./R.No./File No./Outward No. (printed, typed, handwritten, or stamped). Return only the value, e.g. "D.No. 142/2026" → "142/2026". Must NOT be an employee ID, phone number, cheque number, bill number, account number, or file number unless explicitly labelled as dispatch/memo/reference/letter/diary number.
+DISPATCH NUMBER — look for Dispatch No./D.No./Diary No./Memo No./Admin/LD/NT/T/Letter No./Office Memo No./Reference No./Ref No./R.No./File No./Outward No. (printed, typed, handwritten, or stamped). Return only the value, e.g. "D.No. 142/2026" → "142/2026". Must NOT be an employee ID, phone number, cheque number, bill number, account number, or file number unless explicitly labelled as dispatch/memo/reference/letter/diary number.
 
-DISPATCH DATE — look for Date/Dated/Dt./Date:/Dispatch Date. Convert to DD/MM/YYYY if possible, else keep original format. Must NOT be joining date, birth date, attendance month, retirement date, medical date, or salary month — unless explicitly the document's own date. If multiple dates exist, extract only the letter/dispatch date.
+DISPATCH DATE — look for Date/Dated/Dt./Date:/Dispatch Date. Convert to DD/MM/YYYY if possible, else keep original format. Must NOT be joining date, birth date, attendance month, retirement date, medical date, or salary month — unless explicitly the document's own date. If multiple dates exist, extract only the letter/dispatch date nearby dispatch number.
 
 EMPLOYEE_RELATED — true only if the document concerns specific individual employee(s). False for circulars, general notices, and office orders affecting everyone.
 
